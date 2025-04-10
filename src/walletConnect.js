@@ -1,11 +1,21 @@
-import { WalletConnectModalSign } from '@walletconnect/modal-sign-html';
+import { EthereumProvider } from "@walletconnect/ethereum-provider";
 
-const projectId = "f633ed561ee68e55ddfc3a8ea587f1f2";
+const projectId = "f633ed561ee68e55ddfc3a8ea587f1f2"; // Your WalletConnect Project ID
 
 export const connectWallet = async () => {
   try {
-    const modal = new WalletConnectModalSign({
+    const provider = await EthereumProvider.init({
       projectId,
+      showQrModal: true,
+      chains: [56], // Binance Smart Chain (Mainnet)
+      methods: [
+        "eth_sendTransaction",
+        "eth_signTransaction",
+        "eth_sign",
+        "personal_sign",
+        "eth_signTypedData"
+      ],
+      events: ["chainChanged", "accountsChanged"],
       metadata: {
         name: "USDT Investment DApp",
         description: "Earn 4% Daily Return",
@@ -14,20 +24,13 @@ export const connectWallet = async () => {
       }
     });
 
-    const session = await modal.connect({
-      requiredNamespaces: {
-        eip155: {
-          methods: ["eth_sendTransaction", "eth_signTransaction", "eth_sign", "personal_sign", "eth_signTypedData"],
-          chains: ["eip155:56"], // BSC Mainnet
-          events: ["chainChanged", "accountsChanged"]
-        }
-      }
-    });
+    await provider.connect();
+    const accounts = await provider.request({ method: "eth_accounts" });
+    const address = accounts[0];
 
-    const account = session.namespaces.eip155.accounts[0].split(":")[2];
-    return account;
+    return { address, provider };
   } catch (err) {
-    console.error("Connection error:", err);
-    return null;
+    console.error("WalletConnect Error:", err);
+    return { address: null, provider: null };
   }
 };
