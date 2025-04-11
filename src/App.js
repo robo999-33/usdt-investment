@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
@@ -52,6 +52,33 @@ function Dashboard({ user }) {
     }
   };
 
+  const fetchInvestments = useCallback(async () => {
+    const q = query(collection(db, "investments"), where("userId", "==", user.uid));
+    const snapshot = await getDocs(q);
+
+    let totalInvested = 0;
+    let totalEarned = 0;
+
+    const items = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      const daysPassed = Math.floor((new Date() - new Date(data.date)) / (1000 * 60 * 60 * 24));
+      const earnings = data.amount * 0.04 * daysPassed;
+
+      totalInvested += data.amount;
+      totalEarned += earnings;
+
+      return { ...data, earnings };
+    });
+
+    setInvestments(items);
+    setDailyEarnings(totalInvested * 0.04);
+    setTotalEarnings(totalEarned);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (user) fetchInvestments();
+  }, [user, fetchInvestments]);
+
   const handleInvest = async () => {
     if (!walletAddress || !investmentAmount) {
       alert("Connect wallet and enter amount.");
@@ -91,40 +118,12 @@ function Dashboard({ user }) {
     alert(`User requested to withdraw ${withdrawAmount} USDT`);
   };
 
-  const fetchInvestments = async () => {
-    const q = query(collection(db, "investments"), where("userId", "==", user.uid));
-    const snapshot = await getDocs(q);
-
-    let totalInvested = 0;
-    let totalEarned = 0;
-
-    const items = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      const daysPassed = Math.floor((new Date() - new Date(data.date)) / (1000 * 60 * 60 * 24));
-      const earnings = data.amount * 0.04 * daysPassed;
-
-      totalInvested += data.amount;
-      totalEarned += earnings;
-
-      return { ...data, earnings };
-    });
-
-    setInvestments(items);
-    setDailyEarnings(totalInvested * 0.04);
-    setTotalEarnings(totalEarned);
-  };
-
-  useEffect(() => {
-    if (user) fetchInvestments();
-  }, [user]);
-
   const handleLogout = async () => {
     await signOut(auth);
   };
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
-      {/* Left Sidebar */}
       <div style={{ width: "300px", backgroundColor: "#f0f0f0", padding: "30px" }}>
         <h2 style={{ color: "green" }}>Investment Summary</h2>
         <p><strong>Wallet:</strong><br /> {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : "Not connected"}</p>
@@ -137,7 +136,6 @@ function Dashboard({ user }) {
         <button onClick={handleLogout} style={{ marginTop: "20px", padding: "10px 20px" }}>Logout</button>
       </div>
 
-      {/* Main Dashboard */}
       <div style={{ flex: 1, padding: "40px" }}>
         <h1 style={{ color: "green" }}>Dashboard</h1>
 
